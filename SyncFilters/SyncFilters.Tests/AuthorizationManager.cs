@@ -1,13 +1,24 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
+﻿using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
-using System.Text;
+using System.Linq;
 using Dapper;
 
 namespace SyncFilters.Tests
 {
+    public class PrincipalEdge
+    {
+        public int StartVertex { get; set; }
+        public int EndVertex { get; set; }
+        public int Hops { get; set; }
+        public short StartPrincipalType { get; set; }
+        public short EndPrincipalType { get; set; }
+        public bool DelMark { get; set; }
+        public int TenantId { get; set; }
+        public byte[] Modified { get; set; }
+        public bool IsDeleted { get; set; }
+    }
+
     public class AuthorizationManager
     {
         private string _databaseName;
@@ -34,15 +45,6 @@ namespace SyncFilters.Tests
                 cmd.Parameters.Add("@TenantId", SqlDbType.Int).Value = tenantId;
 
                 cmd.ExecuteNonQuery();
-                //connection.Execute(@"[dbo].[AddEdgeWithSpaceSavingsPrincipal] @StartVertexId, @EndVertexId, @StartPrincipalType, @EndPrincipalType, @TenantId",
-                //    new
-                //    {
-                //        StartVertexId = userId,
-                //        EndVertexId = groupId,
-                //        StartPrincipalType = 1,
-                //        EndPrincipalType = 2,
-                //        TenantId = tenantId
-                //    });
 
                 connection.Close();
             }
@@ -64,6 +66,22 @@ namespace SyncFilters.Tests
 
                 connection.Close();
             }
+        }
+
+        public IEnumerable<PrincipalEdge> GetPrincpialEdges()
+        {
+            IEnumerable<PrincipalEdge> principals;
+
+            using (var connection = new SqlConnection(DbHelper.GetDatabaseConnectionString(_databaseName)))
+            {
+                connection.Open();
+
+                principals = connection.Query<PrincipalEdge>("select * from PrincipalEdge").ToList();
+
+                connection.Close();
+            }
+
+            return principals;
         }
     }
 }
