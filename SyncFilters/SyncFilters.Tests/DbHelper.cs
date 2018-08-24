@@ -55,14 +55,25 @@ namespace SyncFilters.Tests
 
         public void ExecuteScript(string dbName, string script)
         {
-            var scripts = script.Split(new []{"GO", "go", "Go", "gO"}, StringSplitOptions.RemoveEmptyEntries);
+            using (var connection = new SqlConnection(GetDatabaseConnectionString(dbName)))
+            {
+                connection.Open();
+                var cmdDb = new SqlCommand(script, connection);
+                cmdDb.ExecuteNonQuery();
+                connection.Close();
+            }
+        }
+
+        public void ExecuteScripts(string dbName, string scripts)
+        {
+            var scriptArray = scripts.Split("\r\nGO\r\n");
 
             using (var connection = new SqlConnection(GetDatabaseConnectionString(dbName)))
             {
                 connection.Open();
-                foreach (var s in scripts)
+                foreach (var script in scriptArray)
                 {
-                    var cmdDb = new SqlCommand(s, connection);
+                    var cmdDb = new SqlCommand(script, connection);
                     cmdDb.ExecuteNonQuery();
                 }
                 connection.Close();
