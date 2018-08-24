@@ -37,8 +37,7 @@ namespace SyncFilters.Tests
                 masterConnection.Close();
             }
         }
-
-
+        
         /// <summary>
         /// Delete a database
         /// </summary>
@@ -79,8 +78,7 @@ namespace SyncFilters.Tests
                 connection.Close();
             }
         }
-
-
+        
         /// <summary>
         /// Gets the Create or Re-create a database script text
         /// </summary>
@@ -107,7 +105,5 @@ namespace SyncFilters.Tests
 	                    drop database {dbName}
                     end";
         }
-
-
     }
 }
