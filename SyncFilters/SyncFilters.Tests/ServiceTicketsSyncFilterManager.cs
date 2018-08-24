@@ -72,13 +72,12 @@ when not matched then
 using (values(@Itemid, @Reason, @UserId, @TenantId)) as s(ItemId,AppliedRules,UserId,TenantId)
 on t.itemId = s.ItemId and t.UserId = s.UserId and t.tenantId = s.TenantId
 when matched then 
-	update set t.appliedrules = (case when t.appliedrules & s.appliedrules = s.appliedrules then t.appliedrules^s.appliedrules else t.appliedrules end),
+	update set t.appliedrules &= ~s.appliedrules, --(case when t.appliedrules & s.appliedrules = s.appliedrules then t.appliedrules^s.appliedrules else t.appliedrules end),
 			-- whenever the appliedrules value changes from >0 to 0 or vice versa, update the date
-			t.modified = (case when ((t.appliedrules > 0 and t.appliedrules^s.appliedrules = 0)
-									or (t.appliedrules = 0 and t.appliedrules^s.appliedrules > 0)) 
+			t.modified = (case when (t.appliedrules > 0 and t.appliedrules & ~s.appliedrules = 0) 
 						then @@DBTS+1 else t.modified end),
 			-- whenever the appliedrules value changes to 0, setup the deleted datetime (so we can delete all ""deleted"" stuff after e.g. 3 months)
-			t.deletiontime = (case when (t.appliedrules > 0 and t.appliedrules^s.appliedrules = 0) 
+			t.deletiontime = (case when (t.appliedrules > 0 and t.appliedrules & ~s.appliedrules = 0) 
 						then getutcdate() else '1753-01-01' end)
 when not matched then
 	insert (ItemId,Modified,AppliedRules,UserId,Tenantid,DeletionTime)
