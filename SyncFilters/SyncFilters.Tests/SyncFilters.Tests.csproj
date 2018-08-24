@@ -13,4 +13,11 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.2.0" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\submodules\Dotmim.Sync\Projects\Dotmim.Sync.Core\Dotmim.Sync.Core.csproj" />
+    <ProjectReference Include="..\..\submodules\Dotmim.Sync\Projects\Dotmim.Sync.Sqlite\Dotmim.Sync.Sqlite.csproj" />
+    <ProjectReference Include="..\..\submodules\Dotmim.Sync\Projects\Dotmim.Sync.SqlServer\Dotmim.Sync.SqlServer.csproj" />
+  </ItemGroup>
+
 </Project>

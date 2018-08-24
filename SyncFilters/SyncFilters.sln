@@ -5,6 +5,14 @@ VisualStudioVersion = 15.0.27703.2047
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SyncFilters.Tests", "SyncFilters.Tests\SyncFilters.Tests.csproj", "{9EB9B0B3-961E-44B3-A16B-9E7290913AAC}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dotmim.Sync.Core", "..\submodules\Dotmim.Sync\Projects\Dotmim.Sync.Core\Dotmim.Sync.Core.csproj", "{CE97537E-7B3D-4E23-BD16-B2F821C0DC54}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dotmim.Sync.SqlServer", "..\submodules\Dotmim.Sync\Projects\Dotmim.Sync.SqlServer\Dotmim.Sync.SqlServer.csproj", "{7620C5C1-62FA-4909-9539-20F669220198}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dotmim.Sync.Sqlite", "..\submodules\Dotmim.Sync\Projects\Dotmim.Sync.Sqlite\Dotmim.Sync.Sqlite.csproj", "{9A7D501B-0E79-43CB-AC7F-D1D8D304A109}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Dotmim.Sync", "Dotmim.Sync", "{2D9618D7-F847-4799-B155-446D90E33469}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,9 +23,26 @@ Global
 		{9EB9B0B3-961E-44B3-A16B-9E7290913AAC}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9EB9B0B3-961E-44B3-A16B-9E7290913AAC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9EB9B0B3-961E-44B3-A16B-9E7290913AAC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CE97537E-7B3D-4E23-BD16-B2F821C0DC54}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CE97537E-7B3D-4E23-BD16-B2F821C0DC54}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CE97537E-7B3D-4E23-BD16-B2F821C0DC54}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CE97537E-7B3D-4E23-BD16-B2F821C0DC54}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7620C5C1-62FA-4909-9539-20F669220198}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7620C5C1-62FA-4909-9539-20F669220198}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7620C5C1-62FA-4909-9539-20F669220198}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7620C5C1-62FA-4909-9539-20F669220198}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9A7D501B-0E79-43CB-AC7F-D1D8D304A109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9A7D501B-0E79-43CB-AC7F-D1D8D304A109}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9A7D501B-0E79-43CB-AC7F-D1D8D304A109}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9A7D501B-0E79-43CB-AC7F-D1D8D304A109}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{CE97537E-7B3D-4E23-BD16-B2F821C0DC54} = {2D9618D7-F847-4799-B155-446D90E33469}
+		{7620C5C1-62FA-4909-9539-20F669220198} = {2D9618D7-F847-4799-B155-446D90E33469}
+		{9A7D501B-0E79-43CB-AC7F-D1D8D304A109} = {2D9618D7-F847-4799-B155-446D90E33469}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FDB53D8D-8B9D-4E1A-B786-1C175566D2D5}
