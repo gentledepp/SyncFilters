@@ -122,7 +122,7 @@ namespace SyncFilters.Tests
         public void Deprovision()
         {
             //DbHelper.DeleteDatabase(ServerDbName);
-            DbHelper.DeleteDatabase(Client1DbName);
+            //DbHelper.DeleteDatabase(Client1DbName);
             DbHelper.DeleteDatabase(Client2DbName);
             DbHelper.DeleteDatabase(Client3DbName);
         }
@@ -148,7 +148,7 @@ namespace SyncFilters.Tests
         }
 
         [Fact]
-        public void CannAddMembersToGroup()
+        public void CanAddMembersToGroup()
         {
             // Arrange
             var auth = new AuthorizationManager(_fixture.ServerDbName);
@@ -198,7 +198,7 @@ namespace SyncFilters.Tests
 
             await ProvisionSyncFilters();
 
-            var filterManager = new ServiceTicketsSyncFilterManager(_fixture.ServerDbName);
+            var filterManager = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
 
             // Act
             filterManager.AddFilter(new Guid("48df6e95-827e-42a2-850f-761fa4e66dda"), groupId,
@@ -227,7 +227,7 @@ namespace SyncFilters.Tests
 
             await ProvisionSyncFilters();
 
-            var filterManager = new ServiceTicketsSyncFilterManager(_fixture.ServerDbName);
+            var filterManager = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
             filterManager.AddFilter(new Guid("48df6e95-827e-42a2-850f-761fa4e66dda"), groupId,
                 SyncReasons.BelongsToTenant, tenantId);
             
@@ -266,7 +266,56 @@ namespace SyncFilters.Tests
             Assert.Equal(0, session.TotalChangesDownloaded);
             Assert.Equal(0, session.TotalChangesUploaded);
 
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var tickets = ticketRepo.GetServiceTickets().ToList();
+            tickets.ShouldNotBeEmpty();
+            tickets.Count.ShouldBe(50);
         }
+
+
+        [Fact]
+        public async Task WhenSyncFilterIsAdded_SyncsRows()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+
+
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFilters();
+
+            await Task.Delay(200);
+
+            await agent.SynchronizeAsync();
+
+
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
+            }
+
+
+            // Act
+            var session = await agent.SynchronizeAsync();
+
+            // nothing should be downloaded, as no syncfilters are present
+            Assert.Equal(tickets.Count, session.TotalChangesDownloaded);
+            Assert.Equal(0, session.TotalChangesUploaded);
+        }
+
 
         private async Task ProvisionSyncFilters()
         {

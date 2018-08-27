@@ -26,12 +26,12 @@ namespace SyncFilters.Tests
         public byte[] RowVersion { get; set; }
     }
 
-    public class ServiceTicketsSyncFilterManager
+    public class ServiceTicketsSyncFilterRepository
     {
         private string _databaseName;
         private DbHelper _dbHelper;
         
-        public ServiceTicketsSyncFilterManager(string databaseName)
+        public ServiceTicketsSyncFilterRepository(string databaseName)
         {
             _databaseName = databaseName;
             _dbHelper = new DbHelper();
@@ -87,7 +87,6 @@ when not matched then
                 connection.Close();
             }
         }
-
 
         public IEnumerable<SyncFilter> GetSyncFilters()
         {
