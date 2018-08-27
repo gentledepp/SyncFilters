@@ -68,6 +68,8 @@ AND (
 	)
 AND (
 	-- And the row is toombstoned
+	-- NOTE: we do *not* filter fir any syncfilters here => this means that a client may get a tombstoned item, even though (s)he never had a valid sync row assigned
+	--		 this *could* lead to a massive set of rows being unnecessarily transmitted, in case your system has a lot of deletes. However, it speeds up the query for those systems that dont have many deletions - e.g. ones that use soft deletes)
 	[side].[sync_row_is_tombstone] = 1 
 	OR
 	(
@@ -75,8 +77,8 @@ AND (
 		[side].[sync_row_is_tombstone] = 0 AND [base].[Id] is not null	
 		-- and there exists at least one non-deleted syncfilter
 		and exists (select s.id from __TARGETTABLE___syncfilter s
-						inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 --user
-						where s.itemid = [base].id and e.startvertex = @userid and s.appliedrules > 0 and e.isdeleted = 0)
+						inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 and e.startvertex = @userid --user
+						where s.itemid = [base].id and s.appliedrules > 0 and e.isdeleted = 0)
 	)
 )
 UNION ALL
@@ -118,12 +120,12 @@ AND (
 	)
 -- and there is at least one younger, non-deleted syncfilter (permission was added to user)
 and exists (select s.id from __TARGETTABLE___syncfilter s
-					inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 --user
-						where s.itemid = [base].id and e.startvertex = @userid and s.appliedrules > 0 and e.IsDeleted = 0 and (s.modified >  @sync_min_timestamp or e.modified > @sync_min_timestamp))
+					inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 and e.startvertex = @userid --user
+						where s.itemid = [base].id and s.appliedrules > 0 and e.IsDeleted = 0 and (s.modified >  @sync_min_timestamp or e.modified > @sync_min_timestamp))
 -- make sure this item was not already synced by an older valid and non-deleted filter
 and not exists (select s.id from __TARGETTABLE___syncfilter s
-					inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 --user
-						where s.itemid = [base].id and e.startvertex = @userid and s.appliedrules > 0 and e.IsDeleted = 0 and (s.modified <=  @sync_min_timestamp and e.modified <= @sync_min_timestamp))
+					inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 and e.startvertex = @userid --user
+						where s.itemid = [base].id and s.appliedrules > 0 and e.IsDeleted = 0 and (s.modified <=  @sync_min_timestamp and e.modified <= @sync_min_timestamp))
 UNION ALL
 -- clause 3: get all toombstoned items
 --					- where no non-deleted syncfilter exists
@@ -178,12 +180,12 @@ AND (
 		
 		-- where no non-deleted syncfilter exists
 		not exists (select s.id from __TARGETTABLE___syncfilter s
-							inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 --user
-						where s.itemid = [base].id and e.startvertex = @userid and s.appliedrules > 0 and e.isdeleted = 0)
+							inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 and e.startvertex = @userid --user
+						where s.itemid = [base].id and s.appliedrules > 0 and e.isdeleted = 0)
 		-- and there is a deleted sync filter younger than "date"
 		and exists (select s.id from __TARGETTABLE___syncfilter s 
-							inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 --user
-						where s.itemid = [base].id and e.startvertex = @userid and ((s.appliedrules = 0 and s.modified > @sync_min_timestamp) or (e.IsDeleted = 1 and e.modified > @sync_min_timestamp)))
+							inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 and e.startvertex = @userid --user
+						where s.itemid = [base].id and ((s.appliedrules = 0 and s.modified > @sync_min_timestamp) or (e.IsDeleted = 1 and e.modified > @sync_min_timestamp)))
 	)
 )
 
