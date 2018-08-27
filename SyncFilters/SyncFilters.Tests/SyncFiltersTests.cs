@@ -272,6 +272,43 @@ namespace SyncFilters.Tests
             tickets.Count.ShouldBe(50);
         }
 
+        [Fact]
+        public async Task WhenSyncFiltersExist_SyncsRows()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+
+
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFilters();
+
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
+            }
+
+
+            // Act
+            var session = await agent.SynchronizeAsync();
+
+            // nothing should be downloaded, as no syncfilters are present
+            Assert.Equal(tickets.Count, session.TotalChangesDownloaded);
+            Assert.Equal(0, session.TotalChangesUploaded);
+        }
 
         [Fact]
         public async Task WhenSyncFilterIsAdded_SyncsRows()
@@ -295,7 +332,7 @@ namespace SyncFilters.Tests
 
             await Task.Delay(200);
 
-            await agent.SynchronizeAsync();
+            var s1 = await agent.SynchronizeAsync();
 
 
             auth.AddGroupMember(inspectors, inspector_gadget, 1);
