@@ -31,6 +31,27 @@ namespace SyncFilters.Tests
             _dbHelper = new DbHelper();
         }
 
+
+
+        public void AddUserEntry(int userId, int tenantId)
+        {
+            using (var connection = new SqlConnection(DbHelper.GetDatabaseConnectionString(_databaseName)))
+            {
+                connection.Open();
+
+                var cmd = new SqlCommand("[dbo].[AddEdgeWithSpaceSavingsPrincipal] @StartVertexId, @EndVertexId, @StartPrincipalType, @EndPrincipalType, @TenantId", connection);
+                cmd.Parameters.Add("@StartVertexId", SqlDbType.BigInt).Value = userId;
+                cmd.Parameters.Add("@EndVertexId", SqlDbType.BigInt).Value = userId;
+                cmd.Parameters.Add("@StartPrincipalType", SqlDbType.TinyInt).Value = 1;
+                cmd.Parameters.Add("@EndPrincipalType", SqlDbType.TinyInt).Value = 2;
+                cmd.Parameters.Add("@TenantId", SqlDbType.Int).Value = tenantId;
+
+                cmd.ExecuteNonQuery();
+
+                connection.Close();
+            }
+        }
+
         public void AddGroupMember(int groupId, int userId, int tenantId)
         {
             using (var connection = new SqlConnection(DbHelper.GetDatabaseConnectionString(_databaseName)))

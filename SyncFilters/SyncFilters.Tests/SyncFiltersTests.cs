@@ -167,6 +167,24 @@ namespace SyncFilters.Tests
         }
 
         [Fact]
+        public void CanAddMemberToUserDirectly()
+        {
+            // Arrange
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+            var userId = 1;
+            var tenantId = 1;
+
+            // Act
+            auth.AddUserEntry(userId, tenantId);
+
+            // Assert
+            var edges1 = auth.GetPrincpialEdges().ToList();
+            edges1.ShouldNotBeEmpty();
+            edges1.Single().IsDeleted.ShouldBeFalse();
+
+        }
+
+        [Fact]
         public void CanRemoveMembersFromGroup()
         {
             // Arrange
@@ -358,7 +376,6 @@ namespace SyncFilters.Tests
             var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
             var auth = new AuthorizationManager(_fixture.ServerDbName);
 
-
             SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
 
             SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
@@ -368,6 +385,9 @@ namespace SyncFilters.Tests
             agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
 
             await ProvisionSyncFiltersInServerDb();
+            
+            // add user to graph pointing to itself
+            auth.AddUserEntry(inspector_gadget, 1);
 
             // add sync filter row for each ticket
             var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
