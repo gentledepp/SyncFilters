@@ -896,9 +896,159 @@ namespace SyncFilters.Tests
             // Assert 2
             session2.TotalChangesDownloaded.ShouldBe(tickets.Count, "all tickets should be synced as tombstoned");
             session2.TotalChangesUploaded.ShouldBe(0);
-            var barnabyTicketRepo = new ServiceTicketRepository(_fixture.Client1DbName);
-            barnabyTicketRepo.GetServiceTickets().ToList().Count.ShouldBe(0, "all tickets should be deleted");
+            var clientTicketRepo = new ServiceTicketRepository(_fixture.Client1DbName);
+            clientTicketRepo.GetServiceTickets().ToList().Count.ShouldBe(0, "all tickets should be deleted");
 
+        }
+
+        [Fact]
+        public async Task WhenServiceTicketChanges_AndSyncFilterExists_SyncsChanges()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+            
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFiltersInServerDb();
+
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
+            }
+
+            // Act 1
+            var session1 = await agent.SynchronizeAsync();
+
+            // Assert 1
+            session1.TotalChangesDownloaded.ShouldBe(tickets.Count, "all items should be synced");
+            session1.TotalChangesUploaded.ShouldBe(0);
+
+            // Act 2
+            foreach (var ticket in tickets.Take(2))
+            {
+                ticket.Title += " modified";
+                ticketRepo.Update(ticket);
+            }
+
+            var session2 = await agent.SynchronizeAsync();
+            
+
+            // Assert 2
+            session2.TotalChangesDownloaded.ShouldBe(2, "all modified items should be synced");
+            session2.TotalChangesUploaded.ShouldBe(0);
+            var clientTicketRepo = new ServiceTicketRepository(_fixture.Client1DbName);
+            clientTicketRepo.GetServiceTickets().ToList().Count.ShouldBe(40, "all tickets should still be there");
+        }
+
+        [Fact]
+        public async Task WhenServiceTicketIsDeleted_AndSyncFilterExists_SyncsChanges()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFiltersInServerDb();
+
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
+            }
+
+            // Act 1
+            var session1 = await agent.SynchronizeAsync();
+
+            // Assert 1
+            session1.TotalChangesDownloaded.ShouldBe(tickets.Count, "all items should be synced");
+            session1.TotalChangesUploaded.ShouldBe(0);
+
+            // Act 2
+            foreach (var ticket in tickets.Take(7))
+            {
+                ticketRepo.Delete(ticket);
+            }
+
+            var session2 = await agent.SynchronizeAsync();
+
+
+            // Assert 2
+            session2.TotalChangesDownloaded.ShouldBe(7, "all modified items should be synced");
+            session2.TotalChangesUploaded.ShouldBe(0);
+            var clientTicketRepo = new ServiceTicketRepository(_fixture.Client1DbName);
+            clientTicketRepo.GetServiceTickets().ToList().Count.ShouldBe(33, "7 tickets should be deleted");
+        }
+
+        [Fact]
+        public async Task WhenServiceTicketIsDeleted_AndSyncFilterDoesNotExist_SyncsChanges()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFiltersInServerDb();
+
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            // NOTE: NO SYNC FILTERS HERE!!
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+
+            // Act 1
+            var session1 = await agent.SynchronizeAsync();
+
+            // Assert 1
+            session1.TotalChangesDownloaded.ShouldBe(0, "no items should be synced as there are no filters");
+            session1.TotalChangesUploaded.ShouldBe(0);
+
+            // Act 2
+            foreach (var ticket in tickets.Take(7))
+            {
+                ticketRepo.Delete(ticket);
+            }
+
+            var session2 = await agent.SynchronizeAsync();
+
+
+            // Assert 2
+            session2.TotalChangesDownloaded.ShouldBe(0, "rows should not be synced if there is no filter row (even if tombstoned!)");
+            session2.TotalChangesUploaded.ShouldBe(0);
+            var clientTicketRpo = new ServiceTicketRepository(_fixture.Client1DbName);
+            clientTicketRpo.GetServiceTickets().ToList().Count.ShouldBe(0, "there should be no tickets");
         }
 
         private async Task ProvisionSyncFiltersInServerDb()

@@ -45,5 +45,30 @@ namespace SyncFilters.Tests
 
             return principals;
         }
+
+        public void Update(ServiceTicket ticket)
+        {
+            var props = typeof(ServiceTicket).GetProperties()
+                .Where(p => !string.Equals(p.Name, "id", StringComparison.InvariantCultureIgnoreCase)).ToList();
+
+            var setter = string.Join(", ", props.Select(p => $"{p.Name}=@{p.Name}"));
+            var query = $"Update ServiceTickets set {setter} where ID = @ID";
+            using (var connection = new SqlConnection(DbHelper.GetDatabaseConnectionString(_databaseName)))
+            {
+                connection.Open();
+                connection.Execute(query, ticket);
+                connection.Close();
+            }
+        }
+
+        public void Delete(ServiceTicket ticket)
+        {
+            using (var connection = new SqlConnection(DbHelper.GetDatabaseConnectionString(_databaseName)))
+            {
+                connection.Open();
+                connection.Execute("delete from ServiceTickets where ID = @ID", ticket);
+                connection.Close();
+            }
+        }
     }
 }

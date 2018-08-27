@@ -67,20 +67,21 @@ AND (
 	@sync_scope_is_new = 1
 	)
 AND (
-	-- And the row is toombstoned
-	-- NOTE: we do *not* filter fir any syncfilters here => this means that a client may get a tombstoned item, even though (s)he never had a valid sync row assigned
-	--		 this *could* lead to a massive set of rows being unnecessarily transmitted, in case your system has a lot of deletes. However, it speeds up the query for those systems that dont have many deletions - e.g. ones that use soft deletes)
-	[side].[sync_row_is_tombstone] = 1 
-	OR
-	(
-		-- Or there exists a row in the base table (RIGHT JOIN!)s
-		[side].[sync_row_is_tombstone] = 0 AND [base].[Id] is not null	
+		(
+			-- And the row is toombstoned
+			[side].[sync_row_is_tombstone] = 1 
+			OR
+			(
+				-- Or there exists a row in the base table (RIGHT JOIN!)s
+				[side].[sync_row_is_tombstone] = 0 AND [base].[Id] is not null	
+		
+			)
+		)
 		-- and there exists at least one non-deleted syncfilter
 		and exists (select s.id from __TARGETTABLE___syncfilter s
 						inner join principaledge e on e.endvertex = s.userid and e.startprincipaltype = 1 and e.startvertex = @userid --user
-						where s.itemid = [base].id and s.appliedrules > 0 and e.isdeleted = 0)
+						where s.itemid = [side].id and s.appliedrules > 0 and e.isdeleted = 0)
 	)
-)
 UNION ALL
 -- clause 2: get all items, which were not modified, but their sync rows are newer (toombstoned or not)
 SELECT 	[side].[ID], 
