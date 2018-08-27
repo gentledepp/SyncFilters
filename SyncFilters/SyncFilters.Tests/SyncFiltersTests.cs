@@ -397,6 +397,54 @@ namespace SyncFilters.Tests
         }
 
         [Fact]
+        public async Task WhenUserIsRemovedFromGroup_ThatHasActiveSyncFilter_SyncsRowsAsTombstoned()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+
+
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFilters();
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
+            }
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+            
+            // Act 1
+            var session1 = await agent.SynchronizeAsync();
+
+            // Assert 1
+            session1.TotalChangesDownloaded.ShouldBe(tickets.Count, "user is part of inspectors group");
+            session1.TotalChangesUploaded.ShouldBe(0);
+
+            // Act 2
+            auth.RemoveGroupMember(inspectors, inspector_gadget, 1);
+
+            var session = await agent.SynchronizeAsync();
+
+            // Assert 2
+            Assert.Equal(tickets.Count, session.TotalChangesDownloaded);
+            Assert.Equal(0, session.TotalChangesUploaded);
+            var clientTicketRepo = new ServiceTicketRepository(_fixture.Client1ConnectionString);
+            clientTicketRepo.GetServiceTickets().ToList().Count.ShouldBe(0, "all tickets should be deleted");
+        }
+
+
+        [Fact]
         public async Task WhenWhenReasonIsAdded_ToExistingSyncFilter_SyncsNoRows()
         {
             var inspectors = 1;
