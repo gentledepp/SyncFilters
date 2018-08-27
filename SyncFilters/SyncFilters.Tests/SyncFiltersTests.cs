@@ -196,7 +196,7 @@ namespace SyncFilters.Tests
             var tenantId = 1;
             auth.AddGroupMember(groupId, userId, tenantId);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
 
             var filterManager = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
 
@@ -225,7 +225,7 @@ namespace SyncFilters.Tests
             var tenantId = 1;
             auth.AddGroupMember(groupId, userId, tenantId);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
 
             var filterManager = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
             filterManager.AddFilter(new Guid("48df6e95-827e-42a2-850f-761fa4e66dda"), groupId,
@@ -257,7 +257,7 @@ namespace SyncFilters.Tests
             agent.Parameters.Add("ServiceTickets", "TenantId", 1);
             agent.Parameters.Add("ServiceTickets", "UserId", 1);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
 
 
             var session = await agent.SynchronizeAsync();
@@ -290,7 +290,7 @@ namespace SyncFilters.Tests
             agent.Parameters.Add("ServiceTickets", "TenantId", 1);
             agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
 
             auth.AddGroupMember(inspectors, inspector_gadget, 1);
 
@@ -328,7 +328,7 @@ namespace SyncFilters.Tests
             agent.Parameters.Add("ServiceTickets", "TenantId", 1);
             agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
 
             await agent.SynchronizeAsync();
 
@@ -368,7 +368,7 @@ namespace SyncFilters.Tests
             agent.Parameters.Add("ServiceTickets", "TenantId", 1);
             agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
 
             // add sync filter row for each ticket
             var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
@@ -414,7 +414,7 @@ namespace SyncFilters.Tests
             agent.Parameters.Add("ServiceTickets", "TenantId", 1);
             agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
 
             // add sync filter row for each ticket
             var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
@@ -443,7 +443,6 @@ namespace SyncFilters.Tests
             clientTicketRepo.GetServiceTickets().ToList().Count.ShouldBe(0, "all tickets should be deleted");
         }
 
-
         [Fact]
         public async Task WhenWhenReasonIsAdded_ToExistingSyncFilter_SyncsNoRows()
         {
@@ -461,7 +460,7 @@ namespace SyncFilters.Tests
             agent.Parameters.Add("ServiceTickets", "TenantId", 1);
             agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
             
             auth.AddGroupMember(inspectors, inspector_gadget, 1);
 
@@ -505,7 +504,7 @@ namespace SyncFilters.Tests
             agent.Parameters.Add("ServiceTickets", "TenantId", 1);
             agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
 
-            await ProvisionSyncFilters();
+            await ProvisionSyncFiltersInServerDb();
 
             auth.AddGroupMember(inspectors, inspector_gadget, 1);
 
@@ -532,8 +531,68 @@ namespace SyncFilters.Tests
             session.TotalChangesUploaded.ShouldBe(0);
         }
 
+        [Fact]
+        public async Task WhenUserIsAddedToGroup_OnlyAffectedUserGetsNewRows()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var inspector_barnaby = 3;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
 
-        private async Task ProvisionSyncFilters()
+
+            SqlSyncProvider clientProviderGadget = new SqlSyncProvider(_fixture.Client1ConnectionString);
+            SyncAgent agentGadget = new SyncAgent(clientProviderGadget, _serverProvider, new[] { "ServiceTickets" });
+            agentGadget.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agentGadget.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agentGadget.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agentGadget.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+        
+            SqlSyncProvider clientProviderBarnaby = new SqlSyncProvider(_fixture.Client2ConnectionString);
+            SyncAgent agentBarnaby = new SyncAgent(clientProviderBarnaby, _serverProvider, new[] { "ServiceTickets" });
+            agentBarnaby.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agentBarnaby.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agentBarnaby.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agentBarnaby.Parameters.Add("ServiceTickets", "UserId", inspector_barnaby);
+
+
+            await ProvisionSyncFiltersInServerDb();
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
+            }
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            // Act 1
+            var sessionGadget1 = await agentGadget.SynchronizeAsync();
+            var sessionBarnaby1 = await agentBarnaby.SynchronizeAsync();
+
+            // Assert 1
+            sessionGadget1.TotalChangesDownloaded.ShouldBe(tickets.Count, "gadget already has permissions");
+            sessionGadget1.TotalChangesUploaded.ShouldBe(0);
+
+            sessionBarnaby1.TotalChangesDownloaded.ShouldBe(0, "user has no permissions yet");
+            sessionBarnaby1.TotalChangesUploaded.ShouldBe(0);
+
+            // Act 2
+            auth.AddGroupMember(inspectors, inspector_barnaby, 1);
+
+            var sessionGadget2 = await agentGadget.SynchronizeAsync();
+            var sessionBarnaby2 = await agentBarnaby.SynchronizeAsync();
+
+            // Assert 2
+            sessionGadget2.TotalChangesDownloaded.ShouldBe(0, "gadget already had permissions => no reason to resync!");
+            sessionGadget2.TotalChangesUploaded.ShouldBe(0);
+
+            sessionBarnaby2.TotalChangesDownloaded.ShouldBe(tickets.Count, "barnaby should now receive all tickets");
+            sessionBarnaby2.TotalChangesUploaded.ShouldBe(0);
+        }
+
+        private async Task ProvisionSyncFiltersInServerDb()
         {
             await _serverProvider.ProvisionAsync(_configuration, SyncProvision.All);
             // now provision sync filters
