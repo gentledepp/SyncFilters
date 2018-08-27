@@ -330,9 +330,7 @@ namespace SyncFilters.Tests
 
             await ProvisionSyncFilters();
 
-            await Task.Delay(200);
-
-            var s1 = await agent.SynchronizeAsync();
+            await agent.SynchronizeAsync();
 
 
             auth.AddGroupMember(inspectors, inspector_gadget, 1);
@@ -344,13 +342,146 @@ namespace SyncFilters.Tests
                 filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
             }
 
-
             // Act
             var session = await agent.SynchronizeAsync();
 
             // nothing should be downloaded, as no syncfilters are present
             Assert.Equal(tickets.Count, session.TotalChangesDownloaded);
             Assert.Equal(0, session.TotalChangesUploaded);
+        }
+
+        [Fact]
+        public async Task WhenUserIsAddedToGroup_ThatHasActiveSyncFilter_SyncsRows()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+
+
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFilters();
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
+            }
+
+            // Act 1
+            var session1 = await agent.SynchronizeAsync();
+
+            // Assert 1
+            session1.TotalChangesDownloaded.ShouldBe(0, "user has no permissions yet");
+            session1.TotalChangesUploaded.ShouldBe(0);
+
+
+            // Act 2
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            var session = await agent.SynchronizeAsync();
+
+            // Assert 2
+            // nothing should be downloaded, as no syncfilters are present
+            Assert.Equal(tickets.Count, session.TotalChangesDownloaded);
+            Assert.Equal(0, session.TotalChangesUploaded);
+        }
+
+        [Fact]
+        public async Task WhenWhenReasonIsAdded_ToExistingSyncFilter_SyncsNoRows()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFilters();
+            
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant, 1);
+            }
+
+            // sync everything
+            var session1 = await agent.SynchronizeAsync();
+            session1.TotalChangesDownloaded.ShouldBe(tickets.Count, "all tickets expected");
+
+            // Act: now add another rule to the same filters
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.IsAssignedUser, 1);
+            }
+            var session = await agent.SynchronizeAsync();
+
+            // Assert
+            session.TotalChangesDownloaded.ShouldBe(0, "nothing should be downloaded, as the filters have not changed");
+            session.TotalChangesUploaded.ShouldBe(0);
+        }
+
+        [Fact]
+        public async Task WhenAllReasonsAreRemoved_FromExistingSyncFilter_SyncsRowsAsTombstoned()
+        {
+            var inspectors = 1;
+            var inspector_gadget = 2;
+            var ticketRepo = new ServiceTicketRepository(_fixture.ServerDbName);
+            var filterRepo = new ServiceTicketsSyncFilterRepository(_fixture.ServerDbName);
+            var auth = new AuthorizationManager(_fixture.ServerDbName);
+
+            SqlSyncProvider clientProvider = new SqlSyncProvider(_fixture.Client1ConnectionString);
+
+            SyncAgent agent = new SyncAgent(clientProvider, _serverProvider, new[] { "ServiceTickets" });
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "TenantId"));
+            agent.Configuration.Filters.Add(new FilterClause("ServiceTickets", "UserId", DbType.Int64));
+            agent.Parameters.Add("ServiceTickets", "TenantId", 1);
+            agent.Parameters.Add("ServiceTickets", "UserId", inspector_gadget);
+
+            await ProvisionSyncFilters();
+
+            auth.AddGroupMember(inspectors, inspector_gadget, 1);
+
+            // add sync filter row for each ticket
+            var tickets = ticketRepo.GetServiceTickets().Where(t => t.TenantId == 1).ToList();
+            foreach (var ticket in tickets)
+            {
+                filterRepo.AddFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant|SyncReasons.IsAssignedUser, 1);
+            }
+
+            // sync everything
+            var session1 = await agent.SynchronizeAsync();
+            session1.TotalChangesDownloaded.ShouldBe(tickets.Count, "all tickets expected");
+
+            // Act: now add another rule to the same filters
+            foreach (var ticket in tickets)
+            {
+                filterRepo.RemoveFilter(ticket.ID, inspectors, SyncReasons.BelongsToTenant|SyncReasons.IsAssignedUser, 1);
+            }
+            var session = await agent.SynchronizeAsync();
+
+            // Assert
+            session.TotalChangesDownloaded.ShouldBe(40, "all tickets should be downloaded as tombstoned");
+            session.TotalChangesUploaded.ShouldBe(0);
         }
 
 
